@@ -1,7 +1,12 @@
 #!/usr/bin/ruby
 
-PREFIX="arc-snps-linux-uclibc"
-OBJDUMP="#{PREFIX}-objdump"
+Prefix=ENV["ARC_PREFIX"] || "arc-snps-linux-uclibc"
+Objdump="#{Prefix}-objdump"
+
+unless (`#{Objdump} --help > /dev/null; echo "EXIT=$?"` =~ /EXIT=0/)
+  puts "#Objdump} not found. Wrong ARC_PREFIX." 
+  exit 0
+end
 
 def usage()
   puts "Incorrectly used"
@@ -28,7 +33,7 @@ class OSymbols
   def self.read_symbols(file)
     ret = {}
 
-    content = `#{OBJDUMP} -R #{file}`.split("\n")
+    content = `#{Objdump} -R #{file}`.split("\n")
     content.each do |c|
       if (c =~ /^([0-9a-fA-F]+)+[ \t]+([^ \t]+)[ \t]+(.+)$/)
         address = convert_op("0x#{$1}")
@@ -36,7 +41,7 @@ class OSymbols
       end
     end
 
-    content = `#{OBJDUMP} -r #{file}`.split("\n")
+    content = `#{Objdump} -r #{file}`.split("\n")
     content.each do |c|
       if (c =~ /^([0-9a-fA-F]+)+[ \t]+([^ \t]+)[ \t]+(.+)$/)
         address = convert_op("0x#{$1}")
@@ -44,7 +49,7 @@ class OSymbols
       end
     end
 
-    content = `#{OBJDUMP} -t #{file}`.split("\n")
+    content = `#{Objdump} -t #{file}`.split("\n")
     content.each do |c|
       regex = "^"
       regex += "([0-9a-fA-F]+) "  # address + space
@@ -172,7 +177,6 @@ end
 
 #puts OSymbols.get_symbol_for_address("000103a8".to_i(16)).name
 
-
-content = `#{OBJDUMP} #{ARGV.join(' ')} #{file}`
+content = `#{Objdump} #{ARGV.join(' ')} #{file}`
 
 embellish(content)

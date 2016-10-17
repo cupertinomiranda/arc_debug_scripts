@@ -1,0 +1,11 @@
+This scripts are related to ARC arch.
+
+objdump_arc_embellish:
+  This scripts is enteded to alias ARC objdump improving the result output
+  by computing ABS addresses for PC relative instructions.
+  When available, the symbol information for the absolute offset is also 
+  printed. 
+
+  In order for the script to work you should define ARC_PREFIX environment
+  variable to contain the prefix for the arc cross compiled toolchain.
+  Example: export ARC_PREFIX=arc-snps-linux-uclibc
