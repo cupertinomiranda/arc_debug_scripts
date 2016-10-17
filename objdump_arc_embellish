@@ -1,0 +1,178 @@
+#!/usr/bin/ruby
+
+PREFIX="arc-snps-linux-uclibc"
+OBJDUMP="#{PREFIX}-objdump"
+
+def usage()
+  puts "Incorrectly used"
+end
+
+def convert_op(op)
+  if(op =~ /^0x[0-9a-z]+/)
+    op = op.to_i(16)
+  elsif(op =~ /[0-9]+/)
+    op = op.to_i(10)
+  end
+  return op
+end
+
+class OSymbols
+  attr_reader :name, :address
+
+  def initialize(address, symbol_name, params = {})
+    @address = address
+    @name = symbol_name
+    @params = params
+  end
+
+  def self.read_symbols(file)
+    ret = {}
+
+    content = `#{OBJDUMP} -R #{file}`.split("\n")
+    content.each do |c|
+      if (c =~ /^([0-9a-fA-F]+)+[ \t]+([^ \t]+)[ \t]+(.+)$/)
+        address = convert_op("0x#{$1}")
+        ret[address] = self.new(address, $3, { reloc_type: $2, dynamic: true })
+      end
+    end
+
+    content = `#{OBJDUMP} -r #{file}`.split("\n")
+    content.each do |c|
+      if (c =~ /^([0-9a-fA-F]+)+[ \t]+([^ \t]+)[ \t]+(.+)$/)
+        address = convert_op("0x#{$1}")
+        ret[address] = self.new(address, $3, { reloc_type: $2, dynamic: false })
+      end
+    end
+
+    content = `#{OBJDUMP} -t #{file}`.split("\n")
+    content.each do |c|
+      regex = "^"
+      regex += "([0-9a-fA-F]+) "  # address + space
+      regex += "(.......) "	  # flags + space
+      regex += "([^ \t]+)[ \t]+"  # section name + spaces
+      regex += "([0-9a-z]+) "	  # size + space
+      regex += "([^ \t\n]+)"	  # attribute or symbol_name
+      regex += "( (.+))?$"	  # symbols name until end
+
+
+      if (c =~ /#{regex}/)
+        address = convert_op("0x#{$1}")
+	attribute = $7 != nil ? $5 : nil
+      	symbol_name = $7 != nil ? $7 : $5
+
+        ret[address] = self.new(address, symbol_name, 
+				{ 
+			          symbol_table: true, 
+			          flags: $2, 
+			          section: $3, 
+			          size: convert_op("0x#{$4}"), 
+			          attributes: attribute 
+				})
+      end
+    end
+    @@data = ret
+  end
+
+  def self.get_symbol_for_address(address)
+    data = @@data[address]
+    if(data)
+      return data
+    end
+    return nil
+  end
+end
+
+def get_relative_offset(address, offset)
+end
+
+def get_instruction_data(insn_line)
+  return nil if insn_line == nil
+  #Split in its several parts
+  tmp = insn_line.split('')
+  insn = tmp[31..-1]
+  address = tmp[0..30]
+
+  insn = insn ? insn.join('') : ""
+  address = address ? address.join('') : ""
+
+  # Parse instruction info
+  if(address =~ /[ \t]+([0-9a-z]+):.+$/)
+    address = convert_op("0x#{$1}")
+
+    regex_operand = "\\[?([^ ,\\]]+)\\]?"
+    regex = ""
+    regex += "([a-z_.]+)"		# Parse first 
+    regex += "[ \t]+"       	# Any spaces
+    regex += regex_operand  	# First argument ignoring any [ or ] 
+    regex += "(,#{regex_operand})?"
+    regex += "(,#{regex_operand})?"
+    insn =~ /#{regex}/
+
+    mnemonic = $1
+    operands = []
+    operands.push(convert_op($2)) if $2
+    operands.push(convert_op($4)) if $4
+    operands.push(convert_op($6)) if $6
+
+    extra_info = {}
+    operands.each_with_index do |op, i|
+      if(op =~ /^pcl$/ && operands[i+1]) # && operands[i+1].class == "Fixnum")
+	extra_info[:relative_offset] = (address & ~3) + operands[i+1] 
+	extra_info[:relative_offset_symbol] = OSymbols.get_symbol_for_address(extra_info[:relative_offset])
+      end
+    end
+
+    return {
+      address: address,
+      mnemonic: mnemonic,
+      operands: operands,
+      extra: extra_info
+    }
+  else
+    return nil
+  end
+end
+
+def embellish(content)
+  content = content.split("\n")
+
+  content.each do |c|
+    c.chomp!
+    
+    # Print content
+    print c
+
+    # Collect instruction data
+    data = get_instruction_data(c)
+
+    # Print extra info
+    if(data && data[:extra] != nil && data[:extra].keys.count > 0)
+      extra = data[:extra]
+      (60 - c.length).times { |a| print " " }
+      10.times { print " " } if ((60 - c.length) < 5)
+      to_print = []
+      if(extra[:relative_offset])
+	to_print.push "ABS=0x#{extra[:relative_offset].to_s(16)}"
+      end
+      if(extra[:relative_offset_symbol])
+	to_print.push "SYM=#{extra[:relative_offset_symbol].name}"
+      end
+      print to_print.join(",")
+    end
+
+    puts "\n"
+
+  end
+end
+
+file = ARGV.pop
+if(file)
+  OSymbols.read_symbols(file)
+end
+
+#puts OSymbols.get_symbol_for_address("000103a8".to_i(16)).name
+
+
+content = `#{OBJDUMP} #{ARGV.join(' ')} #{file}`
+
+embellish(content)
