@@ -9,3 +9,52 @@ objdump_arc_embellish:
   In order for the script to work you should define ARC_PREFIX environment
   variable to contain the prefix for the arc cross compiled toolchain.
   Example: export ARC_PREFIX=arc-snps-linux-uclibc
+
+
+Example output:
+
+$ ./objdump_arc_embellish -j .plt -d glibc/ld-2.23.so
+
+ld-2.23.so:     file format elf32-littlearc
+
+
+Disassembly of section .plt:
+
+000019ec <.plt>:
+    19ec:	2730 7f8b 0001 a614 	ld	r11,[pcl,0x1a614]         ABS=0x1c000
+    19f4:	2730 7f8a 0001 a610 	ld	r10,[pcl,0x1a610]         ABS=0x1c004
+    19fc:	2020 0280           	j	[r10]
+    1a00:	bffc                	btst_s	r15,0x1c
+    1a02:	0001 0000           	b	1a00 <.plt+0x14>
+    1a06:	0000 0000           	b	0
+    1a0a:	0000 2730           	b.d	319488
+    1a0e:	7f8c                	mpy_s	r15,r15,r12
+    1a10:	0001 a5fc           	b.d	ff94d210 <_end+0xff930914>
+    1a14:	2021 0300           	j.d	[r12]
+    1a18:	240a 1fc0           	mov	r12,pcl
+    1a1c:	2730 7f8c 0001 a5f0 	ld	r12,[pcl,0x1a5f0]         ABS=0x1c00c,SYM=malloc@@GLIBC_2.21
+    1a24:	2021 0300           	j.d	[r12]
+    1a28:	240a 1fc0           	mov	r12,pcl
+    1a2c:	2730 7f8c 0001 a5e4 	ld	r12,[pcl,0x1a5e4]         ABS=0x1c010,SYM=calloc@@GLIBC_2.21
+    1a34:	2021 0300           	j.d	[r12]
+    1a38:	240a 1fc0           	mov	r12,pcl
+    1a3c:	2730 7f8c 0001 a5d8 	ld	r12,[pcl,0x1a5d8]         ABS=0x1c014,SYM=realloc@@GLIBC_2.21
+    1a44:	2021 0300           	j.d	[r12]
+    1a48:	240a 1fc0           	mov	r12,pcl
+    1a4c:	2730 7f8c 0001 a5cc 	ld	r12,[pcl,0x1a5cc]         ABS=0x1c018,SYM=free@@GLIBC_2.21
+    1a54:	2021 0300           	j.d	[r12]
+    1a58:	240a 1fc0           	mov	r12,pcl
+
+
+$ ./objdump_arc_embellish -R glibc/ld-2.23.so | grep JMP_SLOT
+
+ld-2.23.so:     file format elf32-littlearc
+
+DYNAMIC RELOCATION RECORDS
+OFFSET   TYPE              VALUE 
+
+0001c008 R_ARC_JMP_SLOT    __libc_memalign@@GLIBC_2.21
+0001c00c R_ARC_JMP_SLOT    malloc@@GLIBC_2.21
+0001c010 R_ARC_JMP_SLOT    calloc@@GLIBC_2.21
+0001c014 R_ARC_JMP_SLOT    realloc@@GLIBC_2.21
+0001c018 R_ARC_JMP_SLOT    free@@GLIBC_2.21
